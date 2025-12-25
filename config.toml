@@ -1,0 +1,140 @@
+# =============================================================================
+# Media Upload Server Configuration
+# =============================================================================
+
+[server]
+# Public API host and port
+host = "0.0.0.0"
+port = 3000
+
+# Admin API (local only) - binds to localhost for security
+admin_host = "127.0.0.1"
+admin_port = 3001
+
+# Base URL for generating media URLs (without trailing slash)
+# This is the public URL that will be returned after upload
+base_url = "http://localhost:3000"
+
+# Request timeout in seconds
+request_timeout = 300
+
+# Maximum concurrent connections
+max_connections = 1000
+
+# Cache-Control max-age in seconds (default: 31536000 = 1 year)
+cache_max_age = 31536000
+
+# Cleanup interval for expired upload sessions in seconds
+cleanup_interval_seconds = 300
+
+[storage]
+# Base directory for storing media files
+data_dir = "./data"
+
+# Directory for original files (relative to data_dir)
+originals_dir = "originals"
+
+# Directory for optimized/converted files (relative to data_dir)
+optimized_dir = "optimized"
+
+# Directory for temporary/in-progress uploads (relative to data_dir)
+temp_dir = "temp"
+
+# Number of directory nesting levels for file storage (0-4)
+# Each level uses 2 hex characters from UUID to create subdirectories.
+# This prevents having too many files in a single directory.
+#   0 = flat storage: originals/{uuid}.jpg
+#   1 = 256 subdirs:  originals/ab/{uuid}.jpg
+#   2 = 65,536 subdirs: originals/ab/cd/{uuid}.jpg (recommended)
+#   3 = 16M subdirs:  originals/ab/cd/ef/{uuid}.jpg
+#   4 = 4B subdirs:   originals/ab/cd/ef/gh/{uuid}.jpg
+directory_levels = 2
+
+[upload]
+# Maximum file size for simple upload (in bytes)
+# 50 MB default
+max_simple_upload_size = 52428800
+
+# Maximum file size for chunked upload (in bytes)
+# 500 MB default
+max_chunked_upload_size = 524288000
+
+# Chunk size for chunked uploads (in bytes)
+# 5 MB default
+chunk_size = 5242880
+
+# Allowed MIME types for images
+allowed_image_types = [
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "image/webp"
+]
+
+# Allowed MIME types for videos (future)
+allowed_video_types = [
+    "video/mp4",
+    "video/webm",
+    "video/quicktime"
+]
+
+# Upload session timeout in seconds (for chunked uploads)
+# Sessions older than this will be cleaned up
+upload_session_timeout = 3600
+
+[processing]
+# Output format for optimized images: webp, jpeg, png
+output_format = "webp"
+
+# Quality for lossy formats (0-100)
+# Higher = better quality, larger files
+output_quality = 85
+
+# Maximum image dimension (width or height)
+# Images larger than this will be resized
+max_image_dimension = 4096
+
+# Whether to keep original files
+keep_originals = true
+
+# Whether to strip EXIF data
+strip_exif = true
+
+[rate_limit]
+# Enable rate limiting
+enabled = true
+
+# Maximum requests per window
+requests_per_window = 100
+
+# Window duration in seconds
+window_seconds = 60
+
+# Maximum uploads per IP per window
+uploads_per_window = 20
+
+[logging]
+# Log level: trace, debug, info, warn, error
+level = "info"
+
+# Log format: "pretty" or "json"
+format = "pretty"
+
+# Log to file (optional, leave empty to disable)
+file = ""
+
+[auth]
+# Enable API key authentication for uploads
+enabled = false
+
+# List of valid API keys
+# Generate secure keys: openssl rand -hex 32
+api_keys = []
+
+# Paths that require authentication (empty = all paths except public)
+# Example: ["/api/upload"]
+protected_paths = ["/api/upload"]
+
+# Paths that are always public (bypass auth even if enabled)
+public_paths = ["/health", "/m/"]
+

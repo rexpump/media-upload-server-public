@@ -1,0 +1,67 @@
+[package]
+name = "media-upload-server"
+version = "0.1.0"
+edition = "2021"
+authors = ["Your Name <your.email@example.com>"]
+description = "High-performance media upload and serving server"
+license = "AGPL-3.0"
+repository = "https://github.com/yourusername/media-upload-server"
+readme = "README.md"
+keywords = ["media", "upload", "server", "image", "webp"]
+categories = ["web-programming::http-server"]
+
+[dependencies]
+# Async runtime
+tokio = { version = "1.43", features = ["full"] }
+
+# Web framework
+axum = { version = "0.8", features = ["multipart", "macros"] }
+tower = { version = "0.5", features = ["util", "timeout", "limit"] }
+tower-http = { version = "0.6", features = ["fs", "cors", "trace", "limit", "compression-gzip"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.8"
+
+# Database (RocksDB - crash-safe key-value store)
+rocksdb = "0.22"
+
+# Image processing
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp"] }
+
+# Utilities
+uuid = { version = "1.11", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "2.0"
+anyhow = "1.0"
+bytes = "1.9"
+mime_guess = "2.0"
+infer = "0.16"  # Magic bytes detection
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Async utilities
+tokio-util = { version = "0.7", features = ["io"] }
+futures = "0.3"
+
+# Rate limiting
+governor = "0.8"
+dashmap = "6.1"
+
+[dev-dependencies]
+reqwest = { version = "0.12", features = ["multipart", "json"] }
+tempfile = "3.14"
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.dev]
+opt-level = 0
+debug = true
+
