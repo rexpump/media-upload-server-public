@@ -32,9 +32,9 @@ Thumbs.db
 /temp
 
 # E2E test artifacts
-# /e2e/node_modules/
-# /e2e/bun.lockb
-# /e2e/logs/
+/e2e/node_modules/
+/e2e/bun.lockb
+/e2e/logs/
 
 # Foundry build artifacts
 /e2e/foundry/out/
