@@ -28,3 +28,15 @@ Thumbs.db
 .env
 .env.local
 
+# Временная папка
+/temp
+
+# E2E test artifacts
+/e2e/node_modules/
+/e2e/bun.lockb
+/e2e/logs/
+
+# Foundry build artifacts
+/e2e/foundry/out/
+/e2e/foundry/cache/
+/e2e/foundry/broadcast/

@@ -407,6 +407,11 @@ All errors return a consistent JSON format:
 | `payload_too_large` | 413 | File too large |
 | `rate_limit_exceeded` | 429 | Too many requests |
 | `upload_session_error` | 400 | Session expired/invalid |
+| `unauthorized` | 401 | Authentication required |
+| `token_locked` | 403 | Token is locked by admin |
+| `update_cooldown` | 429 | Too soon since last update |
+| `invalid_signature` | 400 | Signature verification failed |
+| `not_authorized` | 403 | Not authorized for action |
 | `internal_error` | 500 | Server error |
 
 ---
@@ -425,4 +430,157 @@ X-RateLimit-Limit: 100
 X-RateLimit-Remaining: 95
 X-RateLimit-Reset: 1704067200
 ```
+
+---
+
+## RexPump Token Metadata API
+
+### Overview
+
+The RexPump API allows token owners to manage metadata for their mempad tokens. Token ownership is verified via EVM signature and on-chain `creator()` function call.
+
+### Public Endpoints
+
+#### Create/Update Token Metadata
+
+```
+POST /api/rexpump/metadata
+Content-Type: multipart/form-data
+```
+
+**Request Fields:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `chain_id` | number | Yes | Network chain ID (e.g., 32769 for Zilliqa mainnet) |
+| `token_address` | string | Yes | Token contract address (0x-prefixed) |
+| `token_owner` | string | Yes | Owner address for verification |
+| `timestamp` | number | Yes | Unix timestamp (must be within 5 minutes) |
+| `signature` | string | Yes | personal_sign signature of the message |
+| `metadata` | JSON string | No* | Token metadata (description, social_networks) |
+| `image_light` | file | No* | Light theme image |
+| `image_dark` | file | No* | Dark theme image |
+
+*At least one of `metadata`, `image_light`, or `image_dark` must be provided.
+
+**Signature Message Format:**
+
+```
+RexPump Metadata Update
+Chain: {chain_id}
+Token: {token_address}
+Timestamp: {timestamp}
+```
+
+**Metadata JSON Schema:**
+
+```json
+{
+  "description": "Token description (max 255 chars)",
+  "social_networks": [
+    {
+      "name": "telegram",
+      "link": "https://t.me/example"
+    }
+  ]
+}
+```
+
+**Response (200 OK):**
+
+```json
+{
+  "chain_id": 32769,
+  "token_address": "0x...",
+  "description": "My token",
+  "social_networks": [...],
+  "image_light_url": "http://localhost:3000/m/uuid",
+  "image_dark_url": null,
+  "created_at": "2024-01-01T00:00:00Z",
+  "updated_at": "2024-01-01T00:00:00Z"
+}
+```
+
+#### Get Token Metadata
+
+```
+GET /api/rexpump/metadata/{chain_id}/{token_address}
+```
+
+**Response (200 OK):**
+
+Same as create/update response.
+
+---
+
+### Admin Endpoints (localhost:3001)
+
+#### Lock Token
+
+```
+POST /admin/rexpump/lock/{chain_id}/{token_address}
+Content-Type: application/json
+```
+
+**Request Body:**
+
+```json
+{
+  "lock_type": "locked",
+  "reason": "Optional reason"
+}
+```
+
+Lock types:
+- `locked` - Content frozen as-is
+- `locked_with_defaults` - Content replaced with defaults (images deleted)
+
+#### Unlock Token
+
+```
+DELETE /admin/rexpump/lock/{chain_id}/{token_address}
+```
+
+#### Get Token Metadata (Admin)
+
+```
+GET /admin/rexpump/metadata/{chain_id}/{token_address}
+```
+
+Returns metadata with lock status:
+
+```json
+{
+  "metadata": {...},
+  "lock": {...},
+  "is_locked": true
+}
+```
+
+#### Update Token Metadata (Admin)
+
+```
+PUT /admin/rexpump/metadata/{chain_id}/{token_address}
+Content-Type: multipart/form-data
+```
+
+Admin can update without signature verification.
+
+**Fields:**
+
+| Field | Description |
+|-------|-------------|
+| `metadata` | JSON string (replaces entire metadata if provided) |
+| `image_light` | New light image |
+| `image_dark` | New dark image |
+| `remove_image_light` | "true" to remove light image |
+| `remove_image_dark` | "true" to remove dark image |
+
+#### Delete Token Metadata (Admin)
+
+```
+DELETE /admin/rexpump/metadata/{chain_id}/{token_address}
+```
+
+Completely removes token metadata and associated images.
 

@@ -138,3 +138,29 @@ protected_paths = ["/api/upload"]
 # Paths that are always public (bypass auth even if enabled)
 public_paths = ["/health", "/m/"]
 
+# =============================================================================
+# RexPump Token Metadata Feature
+# =============================================================================
+
+[rexpump]
+# Enable the RexPump metadata feature
+enabled = true
+
+# Minimum seconds between metadata updates per token
+update_cooldown_seconds = 60
+
+# Maximum age of signature timestamp in seconds (anti-replay protection)
+signature_max_age_seconds = 300
+
+# Zilliqa Mainnet
+[rexpump.networks.zilliqa_mainnet]
+name = "zilliqa_mainnet"
+chain_id = 32769
+rpc_url = "https://ssn.zilpay.io/api"
+fallback_rpc_url = "https://api.zilliqa.com"
+
+# Zilliqa Testnet
+[rexpump.networks.zilliqa_testnet]
+name = "zilliqa_testnet"
+chain_id = 33101
+rpc_url = "https://api.testnet.zilliqa.com"

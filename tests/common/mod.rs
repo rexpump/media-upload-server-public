@@ -2,13 +2,12 @@
 
 use media_upload_server::{
     config::{
-        Config, LoggingConfig, ProcessingConfig, RateLimitConfig, ServerConfig, StorageConfig,
-        UploadConfig, AuthConfig,
+        Config, LoggingConfig, ProcessingConfig, RateLimitConfig, RexPumpConfig, ServerConfig,
+        StorageConfig, UploadConfig, AuthConfig,
     },
     create_admin_router, create_public_router, AppState,
 };
 use std::net::TcpListener;
-use std::path::PathBuf;
 use std::time::Duration;
 use tempfile::TempDir;
 use tokio::net::TcpListener as TokioTcpListener;
@@ -181,6 +180,7 @@ fn create_test_config(
             protected_paths: vec!["/api/upload".to_string()],
             public_paths: vec!["/health".to_string(), "/m/".to_string()],
         },
+        rexpump: RexPumpConfig::default(),
     }
 }
 

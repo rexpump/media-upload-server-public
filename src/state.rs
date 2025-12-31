@@ -14,7 +14,7 @@
 
 use crate::config::Config;
 use crate::error::Result;
-use crate::services::{DatabaseService, ImageProcessor, StorageService};
+use crate::services::{DatabaseService, EvmService, ImageProcessor, StorageService};
 use std::sync::Arc;
 
 /// Shared application state
@@ -34,6 +34,9 @@ pub struct AppState {
 
     /// Image processor for format conversion
     pub image_processor: Arc<ImageProcessor>,
+
+    /// EVM service for blockchain interactions (RexPump)
+    pub evm: Arc<EvmService>,
 }
 
 impl AppState {
@@ -49,12 +52,14 @@ impl AppState {
         let db = DatabaseService::new(&config.storage)?;
         let storage = StorageService::new(&config.storage).await?;
         let image_processor = ImageProcessor::new(&config.processing);
+        let evm = EvmService::new(config.rexpump.networks.clone());
 
         Ok(Self {
             config: Arc::new(config),
             db: Arc::new(db),
             storage: Arc::new(storage),
             image_processor: Arc::new(image_processor),
+            evm: Arc::new(evm),
         })
     }
 
@@ -116,6 +121,7 @@ impl std::fmt::Debug for AppState {
             .field("db", &"<DatabaseService>")
             .field("storage", &"<StorageService>")
             .field("image_processor", &"<ImageProcessor>")
+            .field("evm", &"<EvmService>")
             .finish()
     }
 }

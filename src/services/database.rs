@@ -10,10 +10,16 @@
 //! - `hash_index`: Content hash → UUID mapping (for deduplication)
 //! - `sessions`: Upload sessions (key: UUID)
 //! - `session_expires`: Expiration index (key: timestamp:uuid)
+//! - `token_metadata`: RexPump token metadata (key: chainid:address)
+//! - `token_locks`: RexPump token locks (key: chainid:address)
+//! - `token_rate_limits`: RexPump rate limiting (key: chainid:address)
 
 use crate::config::StorageConfig;
 use crate::error::{AppError, Result};
-use crate::models::{Media, MediaType, UploadSession, UploadSessionStatus};
+use crate::models::{
+    Media, MediaType, TokenLock, TokenMetadata, TokenUpdateRecord,
+    UploadSession, UploadSessionStatus,
+};
 use chrono::{DateTime, Utc};
 use rocksdb::{ColumnFamilyDescriptor, DBWithThreadMode, MultiThreaded, Options, WriteBatch};
 use serde::{Deserialize, Serialize};
@@ -29,6 +35,10 @@ const CF_MEDIA: &str = "media";
 const CF_HASH_INDEX: &str = "hash_index";
 const CF_SESSIONS: &str = "sessions";
 const CF_SESSION_EXPIRES: &str = "session_expires";
+// RexPump column families
+const CF_TOKEN_METADATA: &str = "token_metadata";
+const CF_TOKEN_LOCKS: &str = "token_locks";
+const CF_TOKEN_RATE_LIMITS: &str = "token_rate_limits";
 
 /// Database service for managing media metadata
 ///
@@ -69,7 +79,15 @@ impl DatabaseService {
         opts.set_max_write_buffer_number(3);
 
         // Define column families
-        let cf_names = [CF_MEDIA, CF_HASH_INDEX, CF_SESSIONS, CF_SESSION_EXPIRES];
+        let cf_names = [
+            CF_MEDIA,
+            CF_HASH_INDEX,
+            CF_SESSIONS,
+            CF_SESSION_EXPIRES,
+            CF_TOKEN_METADATA,
+            CF_TOKEN_LOCKS,
+            CF_TOKEN_RATE_LIMITS,
+        ];
         let cf_descriptors: Vec<_> = cf_names
             .iter()
             .map(|name| {
@@ -111,6 +129,24 @@ impl DatabaseService {
         self.db
             .cf_handle(CF_SESSION_EXPIRES)
             .expect("CF session_expires must exist")
+    }
+
+    fn cf_token_metadata(&self) -> Arc<rocksdb::BoundColumnFamily<'_>> {
+        self.db
+            .cf_handle(CF_TOKEN_METADATA)
+            .expect("CF token_metadata must exist")
+    }
+
+    fn cf_token_locks(&self) -> Arc<rocksdb::BoundColumnFamily<'_>> {
+        self.db
+            .cf_handle(CF_TOKEN_LOCKS)
+            .expect("CF token_locks must exist")
+    }
+
+    fn cf_token_rate_limits(&self) -> Arc<rocksdb::BoundColumnFamily<'_>> {
+        self.db
+            .cf_handle(CF_TOKEN_RATE_LIMITS)
+            .expect("CF token_rate_limits must exist")
     }
 
     // =========================================================================
@@ -386,6 +422,171 @@ impl DatabaseService {
         }
 
         Ok(expired_ids)
+    }
+
+    // =========================================================================
+    // Token metadata operations (RexPump)
+    // =========================================================================
+
+    /// Upsert token metadata (create or update)
+    pub fn upsert_token_metadata(&self, meta: &TokenMetadata) -> Result<()> {
+        let key = meta.storage_key();
+        let data = serde_json::to_vec(meta)?;
+
+        self.db
+            .put_cf(&self.cf_token_metadata(), key.as_bytes(), &data)
+            .map_err(|e| AppError::internal(format!("RocksDB write failed: {}", e)))?;
+
+        debug!(key = %key, "Upserted token metadata");
+        Ok(())
+    }
+
+    /// Get token metadata
+    pub fn get_token_metadata(&self, chain_id: u64, address: &str) -> Result<Option<TokenMetadata>> {
+        let key = TokenMetadata::make_key(chain_id, address);
+        
+        match self
+            .db
+            .get_cf(&self.cf_token_metadata(), key.as_bytes())
+            .map_err(|e| AppError::internal(format!("RocksDB read failed: {}", e)))?
+        {
+            Some(data) => {
+                let meta: TokenMetadata = serde_json::from_slice(&data)?;
+                Ok(Some(meta))
+            }
+            None => Ok(None),
+        }
+    }
+
+    /// Delete token metadata
+    pub fn delete_token_metadata(&self, chain_id: u64, address: &str) -> Result<bool> {
+        let key = TokenMetadata::make_key(chain_id, address);
+        
+        // Check if exists first
+        if self.get_token_metadata(chain_id, address)?.is_none() {
+            return Ok(false);
+        }
+
+        // Delete metadata, lock, and rate limit atomically
+        let mut batch = WriteBatch::default();
+        batch.delete_cf(&self.cf_token_metadata(), key.as_bytes());
+        batch.delete_cf(&self.cf_token_locks(), key.as_bytes());
+        batch.delete_cf(&self.cf_token_rate_limits(), key.as_bytes());
+
+        self.db
+            .write(batch)
+            .map_err(|e| AppError::internal(format!("RocksDB delete failed: {}", e)))?;
+
+        debug!(key = %key, "Deleted token metadata");
+        Ok(true)
+    }
+
+    // =========================================================================
+    // Token locking operations (RexPump)
+    // =========================================================================
+
+    /// Lock a token
+    pub fn lock_token(&self, lock: &TokenLock) -> Result<()> {
+        let key = lock.storage_key();
+        let data = serde_json::to_vec(lock)?;
+
+        self.db
+            .put_cf(&self.cf_token_locks(), key.as_bytes(), &data)
+            .map_err(|e| AppError::internal(format!("RocksDB write failed: {}", e)))?;
+
+        info!(key = %key, lock_type = ?lock.lock_type, "Locked token");
+        Ok(())
+    }
+
+    /// Unlock a token
+    pub fn unlock_token(&self, chain_id: u64, address: &str) -> Result<bool> {
+        let key = TokenMetadata::make_key(chain_id, address);
+        
+        // Check if locked first
+        if self.get_token_lock(chain_id, address)?.is_none() {
+            return Ok(false);
+        }
+
+        self.db
+            .delete_cf(&self.cf_token_locks(), key.as_bytes())
+            .map_err(|e| AppError::internal(format!("RocksDB delete failed: {}", e)))?;
+
+        info!(key = %key, "Unlocked token");
+        Ok(true)
+    }
+
+    /// Get token lock
+    pub fn get_token_lock(&self, chain_id: u64, address: &str) -> Result<Option<TokenLock>> {
+        let key = TokenMetadata::make_key(chain_id, address);
+        
+        match self
+            .db
+            .get_cf(&self.cf_token_locks(), key.as_bytes())
+            .map_err(|e| AppError::internal(format!("RocksDB read failed: {}", e)))?
+        {
+            Some(data) => {
+                let lock: TokenLock = serde_json::from_slice(&data)?;
+                Ok(Some(lock))
+            }
+            None => Ok(None),
+        }
+    }
+
+    /// Check if token is locked
+    pub fn is_token_locked(&self, chain_id: u64, address: &str) -> Result<bool> {
+        Ok(self.get_token_lock(chain_id, address)?.is_some())
+    }
+
+    // =========================================================================
+    // Rate limiting operations (RexPump)
+    // =========================================================================
+
+    /// Check if token can be updated (cooldown has passed)
+    pub fn can_update_token(&self, chain_id: u64, address: &str, cooldown_secs: u64) -> Result<bool> {
+        let key = TokenMetadata::make_key(chain_id, address);
+        
+        match self
+            .db
+            .get_cf(&self.cf_token_rate_limits(), key.as_bytes())
+            .map_err(|e| AppError::internal(format!("RocksDB read failed: {}", e)))?
+        {
+            Some(data) => {
+                let record: TokenUpdateRecord = serde_json::from_slice(&data)?;
+                Ok(record.can_update(cooldown_secs))
+            }
+            None => Ok(true), // No record means never updated, so allowed
+        }
+    }
+
+    /// Get seconds until next allowed update (0 if can update now)
+    pub fn seconds_until_update(&self, chain_id: u64, address: &str, cooldown_secs: u64) -> Result<i64> {
+        let key = TokenMetadata::make_key(chain_id, address);
+        
+        match self
+            .db
+            .get_cf(&self.cf_token_rate_limits(), key.as_bytes())
+            .map_err(|e| AppError::internal(format!("RocksDB read failed: {}", e)))?
+        {
+            Some(data) => {
+                let record: TokenUpdateRecord = serde_json::from_slice(&data)?;
+                Ok(record.seconds_until_update(cooldown_secs))
+            }
+            None => Ok(0),
+        }
+    }
+
+    /// Record a token update for rate limiting
+    pub fn record_token_update(&self, chain_id: u64, address: &str) -> Result<()> {
+        let key = TokenMetadata::make_key(chain_id, address);
+        let record = TokenUpdateRecord::new(chain_id, address.to_string());
+        let data = serde_json::to_vec(&record)?;
+
+        self.db
+            .put_cf(&self.cf_token_rate_limits(), key.as_bytes(), &data)
+            .map_err(|e| AppError::internal(format!("RocksDB write failed: {}", e)))?;
+
+        debug!(key = %key, "Recorded token update time");
+        Ok(())
     }
 }
 

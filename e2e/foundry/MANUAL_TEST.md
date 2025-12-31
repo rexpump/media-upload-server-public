@@ -1,0 +1,1 @@
+forge create src/TestMemecoin.sol:TestMemecoin --rpc-url https://api.testnet.zilliqa.com --private-key 0x62d5b9641637f0e4f91b49a9854880919b3e72126ee95da6cbafbf32416da836 --constructor-args "TestToken" "TT" 2>&1

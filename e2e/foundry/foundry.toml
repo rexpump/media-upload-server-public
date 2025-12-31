@@ -1,0 +1,13 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+solc = "0.8.26"
+evm_version = "shanghai"  # Zilliqa EVM не поддерживает Cancun opcodes
+
+[rpc_endpoints]
+zilliqa_testnet = "https://api.testnet.zilliqa.com"
+zilliqa_mainnet = "https://api.zilliqa.com"
+
+[etherscan]
+# No etherscan for Zilliqa, but foundry requires this section

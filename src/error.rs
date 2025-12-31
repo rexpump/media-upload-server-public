@@ -63,6 +63,26 @@ pub enum AppError {
     #[error("Upload session error: {0}")]
     UploadSessionError(String),
 
+    /// Authentication required
+    #[error("Unauthorized: {0}")]
+    Unauthorized(String),
+
+    /// Token is locked by admin (RexPump)
+    #[error("Token locked: {0}")]
+    TokenLocked(String),
+
+    /// Rate limit for token updates exceeded (RexPump)
+    #[error("Update cooldown: {0}")]
+    UpdateCooldown(String),
+
+    /// Signature verification failed (RexPump)
+    #[error("Invalid signature: {0}")]
+    InvalidSignature(String),
+
+    /// Not authorized to perform action (RexPump)
+    #[error("Not authorized: {0}")]
+    NotAuthorized(String),
+
     // -------------------------------------------------------------------------
     // Server Errors (5xx)
     // -------------------------------------------------------------------------
@@ -147,6 +167,11 @@ impl AppError {
             Self::PayloadTooLarge(_) => StatusCode::PAYLOAD_TOO_LARGE,
             Self::RateLimitExceeded(_) => StatusCode::TOO_MANY_REQUESTS,
             Self::UploadSessionError(_) => StatusCode::BAD_REQUEST,
+            Self::Unauthorized(_) => StatusCode::UNAUTHORIZED,
+            Self::TokenLocked(_) => StatusCode::FORBIDDEN,
+            Self::UpdateCooldown(_) => StatusCode::TOO_MANY_REQUESTS,
+            Self::InvalidSignature(_) => StatusCode::BAD_REQUEST,
+            Self::NotAuthorized(_) => StatusCode::FORBIDDEN,
 
             // 5xx Server Errors
             Self::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
@@ -216,6 +241,11 @@ impl IntoResponse for AppError {
             Self::PayloadTooLarge(_) => "payload_too_large",
             Self::RateLimitExceeded(_) => "rate_limit_exceeded",
             Self::UploadSessionError(_) => "upload_session_error",
+            Self::Unauthorized(_) => "unauthorized",
+            Self::TokenLocked(_) => "token_locked",
+            Self::UpdateCooldown(_) => "update_cooldown",
+            Self::InvalidSignature(_) => "invalid_signature",
+            Self::NotAuthorized(_) => "not_authorized",
             Self::Internal(_) => "internal_error",
             Self::Io(_) => "io_error",
             Self::Database(_) => "database_error",

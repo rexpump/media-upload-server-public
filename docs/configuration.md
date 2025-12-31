@@ -343,3 +343,62 @@ Estimate storage needs:
 
 With `keep_originals = true`, roughly double these estimates.
 
+---
+
+## RexPump Configuration
+
+The `[rexpump]` section enables the token metadata API for RexPump mempad tokens.
+
+### Basic Configuration
+
+```toml
+[rexpump]
+# Enable/disable the RexPump API
+enabled = true
+
+# Minimum seconds between updates for the same token
+update_cooldown_seconds = 60
+
+# Maximum age of signature timestamp (anti-replay protection)
+signature_max_age_seconds = 300
+```
+
+### Network Configuration
+
+Configure supported EVM networks for token ownership verification:
+
+```toml
+[rexpump.networks.zilliqa_mainnet]
+name = "zilliqa_mainnet"
+chain_id = 32769
+rpc_url = "https://ssn.zilpay.io/api"
+fallback_rpc_url = "https://api.zilliqa.com"
+
+[rexpump.networks.zilliqa_testnet]
+name = "zilliqa_testnet"
+chain_id = 33101
+rpc_url = "https://dev-api.zilliqa.com"
+```
+
+### Network Options
+
+| Option | Description |
+|--------|-------------|
+| `name` | Network identifier (for logging) |
+| `chain_id` | EVM chain ID |
+| `rpc_url` | Primary JSON-RPC endpoint |
+| `fallback_rpc_url` | Optional backup RPC (used if primary fails) |
+
+### Security Considerations
+
+1. **Signature Verification**: Uses EIP-191 personal_sign with timestamp
+2. **Anti-Replay**: Signatures expire after `signature_max_age_seconds`
+3. **Rate Limiting**: Per-token cooldown via `update_cooldown_seconds`
+4. **Owner Verification**: Calls on-chain `creator()` function via RPC
+
+### Production Tips
+
+- Use reliable RPC providers with fallback
+- Set appropriate cooldown to prevent spam
+- Monitor RPC availability for token verification
+```

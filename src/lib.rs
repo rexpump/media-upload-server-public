@@ -162,6 +162,7 @@ pub fn create_public_router(state: AppState) -> Router {
 
     Router::new()
         .nest("/api/upload", handlers::upload_routes())
+        .nest("/api/rexpump", handlers::rexpump_routes())
         .nest("/m", handlers::serve_routes())
         .nest("/health", handlers::health_routes())
         .layer(cors)
@@ -176,6 +177,7 @@ pub fn create_public_router(state: AppState) -> Router {
 pub fn create_admin_router(state: AppState) -> Router {
     Router::new()
         .nest("/admin", handlers::admin_routes())
+        .nest("/admin/rexpump", handlers::admin_rexpump_routes())
         .layer(TraceLayer::new_for_http())
         .with_state(state)
 }

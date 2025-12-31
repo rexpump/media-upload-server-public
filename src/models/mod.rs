@@ -5,7 +5,9 @@
 
 mod media;
 mod upload_session;
+pub mod token_metadata;
 
 pub use media::*;
 pub use upload_session::*;
+pub use token_metadata::*;
 

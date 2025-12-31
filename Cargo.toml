@@ -51,6 +51,12 @@ futures = "0.3"
 governor = "0.8"
 dashmap = "6.1"
 
+# EVM/Ethereum utilities (for RexPump signature verification)
+alloy-primitives = "0.8"
+alloy-signer = "0.8"
+hex = "0.4"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+
 [dev-dependencies]
 reqwest = { version = "0.12", features = ["multipart", "json"] }
 tempfile = "3.14"

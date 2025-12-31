@@ -15,6 +15,7 @@
 //! ```
 
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
@@ -42,6 +43,8 @@ pub struct Config {
     pub logging: LoggingConfig,
     #[serde(default)]
     pub auth: AuthConfig,
+    #[serde(default)]
+    pub rexpump: RexPumpConfig,
 }
 
 /// Authentication configuration
@@ -227,6 +230,68 @@ pub struct LoggingConfig {
     pub format: String,
     /// Log to file (optional)
     pub file: String,
+}
+
+/// EVM Network configuration for RexPump
+#[derive(Debug, Clone, Deserialize)]
+pub struct EvmNetworkConfig {
+    /// Network name (for display)
+    pub name: String,
+    /// Chain ID
+    pub chain_id: u64,
+    /// Primary RPC URL
+    pub rpc_url: String,
+    /// Fallback RPC URL (optional)
+    #[serde(default)]
+    pub fallback_rpc_url: Option<String>,
+}
+
+/// RexPump metadata feature configuration
+#[derive(Debug, Clone, Deserialize)]
+pub struct RexPumpConfig {
+    /// Enable the RexPump metadata feature
+    #[serde(default)]
+    pub enabled: bool,
+    /// Minimum seconds between metadata updates per token
+    #[serde(default = "default_update_cooldown")]
+    pub update_cooldown_seconds: u64,
+    /// Maximum age of signature timestamp in seconds
+    #[serde(default = "default_signature_max_age")]
+    pub signature_max_age_seconds: u64,
+    /// Networks configuration (key is network name)
+    #[serde(default)]
+    pub networks: HashMap<String, EvmNetworkConfig>,
+}
+
+fn default_update_cooldown() -> u64 {
+    60 // 1 minute
+}
+
+fn default_signature_max_age() -> u64 {
+    300 // 5 minutes
+}
+
+impl Default for RexPumpConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            update_cooldown_seconds: default_update_cooldown(),
+            signature_max_age_seconds: default_signature_max_age(),
+            networks: HashMap::new(),
+        }
+    }
+}
+
+impl RexPumpConfig {
+    /// Get network config by chain_id
+    pub fn get_network_by_chain_id(&self, chain_id: u64) -> Option<&EvmNetworkConfig> {
+        self.networks.values().find(|n| n.chain_id == chain_id)
+    }
+
+    /// Check if chain_id is configured
+    pub fn is_chain_supported(&self, chain_id: u64) -> bool {
+        self.get_network_by_chain_id(chain_id).is_some()
+    }
 }
 
 impl Config {
